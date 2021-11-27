@@ -58,8 +58,3 @@ Sheng Guo, shengguo8
 	- account: bob
 	- password: bobbob1!
 3. You can share calendar with the dummy account "bob", and view it by logging in with "bob" credentials.
-
-## Grading:
- - -1: escaping input instead of output in php
- - +1: Site is visually appealing
- - -1: Group event not deleted among all users
