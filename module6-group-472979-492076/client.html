@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <title>A Simple Chat System</title>
+   <!-- using bootstrap -->
+   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+      integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.6.1/font/bootstrap-icons.css">
+   <!-- JavaScript Bundle with Popper -->
+   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+      crossorigin="anonymous"></script>
+   <style>
+      .list-group{
+         max-height: 200px;
+         margin-bottom: 10px;
+         overflow:scroll;
+      }
+   </style>
+</head>
+
+<body>
+   <div class="container" id="login">
+      <br><br>
+      <h1>A Simple Chat Server</h1><br>
+      <div class="card">
+         <div class="card-header">
+            <h4>Welcome! Please enter a username to start!</h4>
+         </div>
+         <div class="card-body">
+            <div class="input-group mb-3">
+               <input type="text" class="form-control" placeholder="Username" id="login_input">
+               <button class="btn btn-outline-success" type="button" id="login_btn">Start chatting</button>
+            </div>
+            <p id="create_user_msg"></p>
+         </div>
+      </div>
+   </div>
+   <div id="default"></div>
+   <div id="chatrooms"></div>
+   <div id="room_info"></div> 
+   <div id="chatroom"></div>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+   <script src="/socket.io/socket.io.js"></script>
+   <script>
+      let socketio = io.connect();
+      let display_chatbox = (room_name) => {
+         let chat_room = document.createElement('div');
+         chat_room.setAttribute("id", "room_display")
+         let card = document.createElement('div');
+         card.className = "card border-0";
+         let card_header = document.createElement('div');
+         card_header.className = "card-header text-center";
+         card_header.innerHTML = "Room: " + room_name;
+         let card_body = document.createElement('div');
+         card_body.className = "card-body";
+         card_body.setAttribute("id", "chatbox");
+         let gap_to_bottom = document.createElement('div')
+         gap_to_bottom.innerHTML = "<br><br><br><br><br><br><br><br>";
+         let card_footer = document.createElement('div');
+         card_footer.style.opacity = 1;
+         card_footer.className = "bg-light card-footer fixed-bottom";
+         // for private message: input username
+         let input_group_private = document.createElement('div');
+         input_group_private.className = "input-group mb-3";
+         let input_private_span = document.createElement('span');
+         input_private_span.className = "input-group-text";
+         input_private_span.innerHTML = "Private";
+         let private_input = document.createElement('input');
+         private_input.className = "form-control";
+         private_input.setAttribute("type", "text");
+         private_input.setAttribute("placeholder", "Enter a username to send a private message (optional)");
+         private_input.setAttribute("id", "new_private_message_user");
+         input_group_private.appendChild(input_private_span);
+         input_group_private.appendChild(private_input);
+         // message
+         let input_group = document.createElement('div');
+         input_group.className = "input-group mb-3";
+         let input_span = document.createElement('span');
+         input_span.className = "input-group-text";
+         input_span.innerHTML = "Message";
+         let input = document.createElement('input');
+         input.className = "form-control";
+         input.setAttribute("type", "text");
+         input.setAttribute("placeholder", "Write a message");
+         input.setAttribute("id", "new_message");
+         let button = document.createElement("button");
+         button.className = "btn btn-success";
+         button.setAttribute("type", "button");
+         button.setAttribute("id", "send_msg_btn");
+         button.innerHTML = "Send message";
+         input_group.appendChild(input_span);
+         input_group.appendChild(input);
+         input_group.appendChild(button);
+         // upload file
+         let file_input_group = document.createElement('div');
+         file_input_group.className = "input-group";
+         let file_input = document.createElement('input');
+         file_input.className = "form-control";
+         file_input.setAttribute("type", "file");
+         file_input.setAttribute("id", "new_file_upload");
+         file_input.setAttribute("aria-describedby", 'inputGroupFileAddon04');
+         file_input.setAttribute("aria-label", 'Upload image');
+         let file_button = document.createElement("button");
+         file_button.className = "btn btn-outline-secondary";
+         file_button.setAttribute("type", "button");
+         file_button.setAttribute("id", "send_file_btn");
+         file_button.innerHTML = "Upload";
+         file_input_group.appendChild(file_input);
+         file_input_group.appendChild(file_button);
+
+         let leave_button_gap = document.createElement('div');
+         leave_button_gap.innerHTML = "<br>";
+         let leave_room_button = document.createElement("button");
+         leave_room_button.className = "btn btn-danger";
+         leave_room_button.setAttribute("type", "button");
+         leave_room_button.setAttribute("id", "leave_room_btn");
+         leave_room_button.innerHTML = "Leave room";
+
+         card_footer.appendChild(input_group_private);
+         card_footer.appendChild(input_group);
+         card_footer.appendChild(file_input_group);
+         card_footer.appendChild(leave_button_gap);
+         card_footer.appendChild(leave_room_button);
+
+         card.appendChild(card_header);
+         card.appendChild(card_body);
+         chat_room.appendChild(card);
+         chat_room.appendChild(gap_to_bottom);
+         chat_room.appendChild(card_footer);
+         return chat_room;
+      }
+
+      let display_user_message = (username, message, msg_id) => {
+         let user_msg_display = document.createElement('div');
+         user_msg_display.className = "row";
+         let left_place_holder = document.createElement('div');
+         left_place_holder.className = "col-sm-3";
+         let right_place_holder = document.createElement('div');
+         right_place_holder.className = "col-sm-9";
+         let card = document.createElement('div');
+         card.className = "card bg-light";
+         let card_header = document.createElement('div');
+         card_header.className = "card-header text-end";
+         card_header.innerHTML = username;
+         let card_body = document.createElement('div');
+         card_body.className = "card-body";
+         let image = document.createElement('img')
+         image.setAttribute('id', 'uploaded_image' + msg_id);
+         image.className = "card-img-bottom";
+         let user_input = document.createElement('p');
+         user_input.className = "card-text";
+         user_input.innerHTML = message;
+         card_body.appendChild(user_input);
+         card.appendChild(card_header);
+         if (message.length > 0) {
+            card.appendChild(card_body);
+         } else {
+            card.appendChild(image);
+         }
+         right_place_holder.appendChild(card);
+         right_place_holder.appendChild(document.createElement("br"))
+         user_msg_display.appendChild(left_place_holder);
+         user_msg_display.appendChild(right_place_holder);
+         return user_msg_display;
+      }
+
+      let display_other_message = (username, message, msg_id) => {
+         let msg_display = document.createElement('div');
+         msg_display.className = "row";
+         let left_place_holder = document.createElement('div');
+         left_place_holder.className = "col-sm-9";
+         let right_place_holder = document.createElement('div');
+         right_place_holder.className = "col-sm-3";
+         let card = document.createElement('div');
+         card.className = "card bg-light";
+         let card_header = document.createElement('div');
+         card_header.className = "card-header";
+         card_header.innerHTML = username;
+         let card_body = document.createElement('div');
+         card_body.className = "card-body";
+         let image = document.createElement('img')
+         image.setAttribute('id', 'uploaded_image' + msg_id);
+         image.className = "card-img-bottom";
+         let input = document.createElement('p');
+         input.className = "card-text";
+         input.innerHTML = message;
+         card_body.appendChild(input);
+         card.appendChild(card_header);
+         if (message.length > 0) {
+            card.appendChild(card_body);
+         } else {
+            card.appendChild(image);
+         }
+         left_place_holder.appendChild(card);
+         left_place_holder.appendChild(document.createElement("br"))
+         msg_display.appendChild(left_place_holder);
+         msg_display.appendChild(right_place_holder);
+         return msg_display;
+      }
+
+      let display_room_info = (user, room_id, rooms_admins, rooms_users, rooms_bans) => {
+         $("#room_info").empty();
+         let admins = rooms_admins[room_id];
+         let is_admin = admins.includes(user);
+         let normal_users = rooms_users[room_id].filter(value => !admins.includes(value));
+         let banned_users = rooms_bans[room_id];
+         let display_members = document.createElement('ul');
+         display_members.className = "list-group";
+         
+         $("#room_info").html("<h3>Current users</h3>").css("color", "#117A65");
+         if (is_admin) {
+            console.log("Is admin: true")
+            let destroy_btn = document.createElement("button");
+            destroy_btn.className = "btn btn-danger";
+            destroy_btn.innerHTML = "Destroy room";
+            destroy_btn.setAttribute("id", "destroy_room_btn");
+            $("#room_info").append(destroy_btn);
+         }
+
+         for (let i = 0; i < admins.length; i++) {
+            let list_ = document.createElement('li');
+            list_.className = "list-group-item list-group-item-primary";
+            let uname = document.createElement("p");
+            uname.style.display = "inline";  
+            uname.innerHTML = "Admin: " + admins[i];
+            list_.appendChild(uname);
+            display_members.appendChild(list_);
+         }
+
+         for (let i = 0; i < normal_users.length; i++) {
+            let list_ = document.createElement('li');
+            list_.className = "list-group-item";
+            let uname = document.createElement("p");
+            uname.style.display = "inline"; 
+            uname.innerHTML = "User: " + normal_users[i];
+            
+            let hidden_label = document.createElement('label');
+            hidden_label.value = normal_users[i];
+            hidden_label.hidden = "hidden";
+            hidden_label.setAttribute("id", "normal_user" + i);
+
+            if (is_admin) {
+               let kick_btn = document.createElement('button');
+               kick_btn.className = "btn btn-warning btn-sm";
+               kick_btn.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;Kick&nbsp;&nbsp;&nbsp;&nbsp;";
+               kick_btn.setAttribute("id", "normal_user_kick_btn_" + i);
+               let ban_btn = document.createElement('button');
+               ban_btn.className = "btn btn-danger btn-sm";
+               ban_btn.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ban&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+               ban_btn.setAttribute("id", "normal_user_ban_btn_" + i);
+               let admin_btn = document.createElement('button');
+               admin_btn.className = "btn btn-success btn-sm";
+               admin_btn.innerHTML = "Make admin";
+               admin_btn.setAttribute("id", "normal_user_admin_btn_" + i);
+               list_.appendChild(kick_btn);
+               list_.appendChild(ban_btn);
+               list_.appendChild(admin_btn);   
+            }
+            list_.appendChild(uname);
+            display_members.appendChild(list_);
+         }
+
+         for (let i = 0; i < banned_users.length; i++) {
+            let list_ = document.createElement('li');
+            list_.className = "list-group-item list-group-item-danger";
+            let uname = document.createElement("p");
+            uname.style.display = "inline"; 
+            uname.innerHTML = "Banned: " + banned_users[i];
+            list_.appendChild(uname);
+            display_members.appendChild(list_);
+         }
+
+         $("#room_info").append(display_members);
+
+         if (is_admin) {
+            $("#destroy_room_btn").click(function() {
+               socketio.emit("destroy_room", room_id);
+            });
+         }
+
+         for (let i = 0; i < normal_users.length; i++) {
+            $("#normal_user_kick_btn_"+i).click(function() {
+               socketio.emit("leave_room", normal_users[i], room_id);
+            });
+
+            $("#normal_user_ban_btn_"+i).click(function() {
+               socketio.emit("ban_user", normal_users[i], room_id);
+            });
+
+            $("#normal_user_admin_btn_"+i).click(function() {
+               socketio.emit("make_admin", normal_users[i], room_id);
+            });
+         }
+      }
+
+      // create homepage / lobby view
+      // user has to be the current user
+      socketio.on("avail_rooms", function (user, rooms, rooms_admins, rooms_users, rooms_bans) {
+         $("#default").empty();
+         $("#room_info").empty();
+         $("#chatrooms").empty();
+         $("#chatroom").empty();
+         $("#default").append("\
+            <div class='container'> \
+               <br><br><h1>A Simple Chat Server</h1><br> \
+               <div class='card'> \
+                  <h5 class='card-header'>"+ "Welcome " + user + "!" + "</h5> \
+                  <div class='card-body'> \
+                     <p class='card-text'>Create a new chat room or join an existing chat room.</p> \
+                     <form> \
+                        <div class='input-group'> \
+                           <span class='input-group-text'>Room name</span> \
+                           <input type='text' placeholder='Enter a unique room name' class='form-control' id='room_name'> \
+                        </div> \
+                        <div class='input-group mb-3'> \
+                           <span class='input-group-text'>Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> \
+                           <input type='password' placeholder='Enter a password (optional)' class='form-control' id='room_password'  autocomplete='on'> \
+                        </div> \
+                     </form> \
+                     <p id='create_room_display_msg'></p>\
+                     <button class='btn btn-outline-success' type='button' id='create_room_btn'>Create room</button> \
+                     <button class='btn btn-outline-danger' id='logout_btn'>Logout</a> \
+                  </div> \
+               </div> \
+               <br> \
+               <div class='row'> \
+                  <h3>Available rooms<h3> \
+               </div> \
+            </div>");
+         let rooms_display = "<div class='container'><div class='row'>";
+
+         for (let i = 0; i < rooms.length; i++) {
+            let room_info = "Password: Off"
+            if (rooms[i]['room_password'].length > 0) {
+               room_info = "Password: On"
+            }
+            let room = " \
+               <div class='col-sm-4 align-items-stretch'> \
+                  <div class='card'> \
+                     <div class='card-body'> \
+                        <h5 class='card-title'>"+ "Room: " + rooms[i]["room_name"] + "</h5> \
+                        <h6 class='card-subtitle text-muted'>"+ room_info + "</h6>";
+            if (rooms[i]['room_password'].length > 0) {
+               room += "<div class='input-group input-group-sm mb-3'> \
+                           <form> \
+                              <input type='password' class='form-control' placeholder='Please enter password' id='"+ rooms[i]["room_id"] + "_pwd" + "' autocomplete='on'> \
+                           </form> \
+                        </div>";
+            } else {
+               room += "<br><br>";
+            }
+            room += "<button class='btn btn-outline-primary' type='button' id='" + rooms[i]["room_id"] + "_join_btn" + "'>Join room</button> \
+                     <p id='"+ rooms[i]["room_id"] + "_error_msg" + "' style='display:inline'></p> \
+                     </div> \
+                  </div> \
+               </div>";
+            if (i != 0 && i % 3 == 0) {
+               rooms_display += "</div>";
+               rooms_display += "<div class='row'>";
+            }
+            rooms_display += room;
+         }
+         rooms_display += "</div></div>";
+         $("#chatrooms").append(rooms_display);
+
+         $("#create_room_btn").click(function () {
+            socketio.emit("new_room", { "id": socketio.id, "room_name": $("#room_name").val(), "room_password": $("#room_password").val() });
+         });
+
+         $("#logout_btn").click(function () {
+            $("#default").empty();
+            $("#room_info").empty();
+            $("#chatrooms").empty();
+            $("#chatroom").empty();
+            socketio.emit("logout");
+            // reload is needed in order to start a new socket session
+            location.reload();
+         });
+
+         for (let i = 0; i < rooms.length; i++) {
+            let room_id = rooms[i]["room_id"];
+            
+            $("#" + room_id + "_join_btn").click(function () {
+               let user_input_pwd = $("#" + room_id + "_pwd").val();
+               let is_ban = rooms_bans[room_id].includes(user);
+               let is_correct_pwd = (rooms[i]['room_password'].length == 0) || (rooms[i]['room_password'].localeCompare(user_input_pwd) == 0);
+               // check for password for private rooms
+               if (is_correct_pwd && is_ban == false) {
+                  $("#default").empty();
+                  $("#room_info").empty();
+                  $("#chatrooms").empty();
+                  $("#chatroom").empty();
+                  socketio.emit("join_room", socketio.id, room_id);
+                  $("#chatroom").append(display_chatbox(rooms[i]["room_name"]));
+
+                  $("#send_msg_btn").click(function () {
+                     let private_user = $("#new_private_message_user").val();
+                     let user_msg = $("#new_message").val();
+                     if (user_msg.length > 0) {
+                        socketio.emit("new_message", {
+                           "id": socketio.id,
+                           "username": user,
+                           "user_msg": user_msg,
+                           "room": rooms[i],
+                           "private_user": private_user
+                        });
+                     }
+                  });
+
+                  $("#leave_room_btn").click(function () {
+                     $("#room_info").empty();
+                     $("#room_display").empty();
+                     $("#chatrooms").empty();
+                     $("#chatroom").empty();
+                     socketio.emit("leave_room", user, rooms[i]['room_id']);
+                  });
+
+                  $('#send_file_btn').click(function () {
+                     let img_file = document.getElementById("new_file_upload").files[0];
+                     if (img_file) {
+                        socketio.emit("new_file", rooms[i]['room_id'], socketio.id, user, img_file);
+                     }
+                  });
+               } else {
+                  let error_msg = "";
+                  if (is_correct_pwd == false) {
+                     error_msg = "Wrong password! "
+                  }
+                  if (is_ban) {
+                     error_msg += "Sorry you are banned!"
+                  }
+                  $("#" + rooms[i]["room_id"] + "_error_msg").text(error_msg).css("color", "red");
+               }
+            })
+         }
+      });
+      
+      socketio.on("room_info_update", function (user, room_id, rooms_admins, rooms_users, rooms_bans) {
+         $("#room_info").empty();
+         display_room_info(user, room_id, rooms_admins, rooms_users, rooms_bans);
+      });
+
+      // username refers to sender
+      socketio.on("new_message_update", function (id, username, msg, msg_id) {
+         if (id == socketio.id) {
+            $("#chatbox").append(display_user_message(username, msg, msg_id));
+         } else {
+            $("#chatbox").append(display_other_message(username, msg, msg_id));
+         }
+         if (msg.length > 0) {
+            window.scrollTo(0, document.body.scrollHeight);
+         }
+      });
+
+      // username refers to sender
+      socketio.on("new_image_update", function (user_name, msg_id, img_file) {
+         let f = new Blob([img_file], { type: "img/jpg" });
+         document.getElementById("uploaded_image" + msg_id).src = URL.createObjectURL(f);
+
+         window.scrollTo(0, document.body.scrollHeight);
+      })
+
+      // msg to indicate whether room is created successfully
+      socketio.on("create_room_msg", function (msg) {
+         if (msg["success"]) {
+            $("#create_room_display_msg")
+               .text("Congrats! Room \"" + msg["room_name"] + "\" is created successfully!")
+               .css("color", "green");
+         } else {
+            $("#create_room_display_msg")
+               .text(msg['error_msg'])
+               .css("color", "red");
+         }
+      });
+
+      // display error message when user cannot register username
+      socketio.on("create_user_status", function (is_success, msg) {
+         if (is_success) {
+            $("#login").empty();
+         } else {
+            $("#create_user_msg").text(msg).css("color", "red");
+         }
+      });
+
+      // if socket is connected, login starts functioning
+      socketio.on("connect", () => {
+         $("#send_msg").click(function () {
+            var msg = document.getElementById("message_input").value;
+            socketio.emit("message_to_server", { message: msg });
+         });
+
+         $("#login_btn").click(function () {
+            socketio.emit("new_user", { "id": socketio.id, "username": $("#login_input").val() })
+         });
+      })
+
+   </script>
+</body>
+</html>
