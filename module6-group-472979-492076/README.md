@@ -1,7 +1,7 @@
-# CSE330
-# CSE330
-### Albert Yang, 492076, HappyEureka
-### Sheng Guo, 472979, shengguo8
+# This is a group project; the work was completed in collaboration.
+### Albert Yang, HappyEureka
+### Sheng Guo, shengguo8
+
 
 ### Link: http://ec2-3-142-47-53.us-east-2.compute.amazonaws.com:3456/
 
